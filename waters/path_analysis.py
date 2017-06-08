@@ -1,17 +1,17 @@
+# -*- coding: utf-8 -*-
 """
-| Copyright (C) 2017 Johannes Schlatow, Kai-Björn Gemlau, Mischa Möstl
-| TU Braunschweig, Germany
-| All rights reserved.
-
-:Authors:
-         - Johannes Schlatow
-
-Description
------------
-
-This script implements the latency analysis for cause-effect chains.
+-| Copyright (C) 2017 Johannes Schlatow, Kai-Björn Gemlau, Mischa Möstl
+-| TU Braunschweig, Germany
+-| All rights reserved.
+-
+-:Authors:
+-         - Johannes Schlatow
+-
+-Description
+------------
+-
+-This script implements the latency analysis for cause-effect chains.
 """
-
 from __future__ import absolute_import
 from __future__ import print_function
 from __future__ import unicode_literals
@@ -71,18 +71,30 @@ def _cause_effect_chain_latency(chain, task_results, mode, details):
 
     return l_max
 
-def _calculate_distance(writer, reader, task_results, details):
+def _calculate_distanceFW(writer, reader, task_results, details):
+    if task_results[writer].wcrt <= _period(reader):
+        result = reader.in_event_model.delta_plus(2) - task_results[writer].bcrt
+        details['WR:'+writer.name+':'+reader.name+'-d_plus-BCRT'] = result
+        return result
+    else:
+        result = reader.in_event_model.delta_plus(2)
+        details['WR:'+writer.name+':'+reader.name+'-d_plus'] = result
+        return result
+    
+def _calculate_distanceBW(writer, reader, task_results, details):
     if "ISR" in writer.name:
         result = writer.in_event_model.delta_plus(2) + task_results[writer].wcrt - task_results[writer].bcrt
         details['WR:'+writer.name+':'+reader.name+'-d_plus+J'] = result
         return result
     elif task_results[writer].wcrt >= task_results[reader].wcrt:
-        result = writer.in_event_model.delta_plus(2) - task_results[writer].bcrt
-        details['WR:'+writer.name+':'+reader.name+'-d_plus-BCRT'] = result
+        result = writer.in_event_model.delta_plus(2) - task_results[writer].bcrt + (_period(reader) % _period(writer))
+        details['WR:'+writer.name+':'+reader.name+'-d_plus-BCRT+harmOffset'] = result
         return result
     else:
-        details['WR:'+writer.name+':'+reader.name] = 0
-        return 0
+        # only take care for non-harmonic periods
+        result = _period(reader) % _period(writer)
+        details['WR:'+writer.name+':'+reader.name+'+harmOffset'] = result
+        return result
 
 def _period(task):
     if isinstance(task, waters_model.LETTask):
@@ -102,11 +114,13 @@ def _calculate_forward_distance(writer, reader, task_results, details):
 
     elif isinstance(writer, waters_model.LETTask):
         # LET delay is already accounted by read-to-write delay
-        details['WR:'+writer.name+':'+reader.name] = 0
-        return 0
+        # only take care for non-harmonic periods
+        result = _period(writer) % _period(reader)
+        details['WR:'+writer.name+':'+reader.name+'+harmOffset'] = result
+        return result
 
     else:
-        return _calculate_distance(writer, reader, task_results, details)
+        return _calculate_distanceFW(writer, reader, task_results, details)
 
 def _calculate_backward_distance(writer, reader, task_results, details):
     """ computes forward distance (for data age)
@@ -120,11 +134,13 @@ def _calculate_backward_distance(writer, reader, task_results, details):
 
     elif isinstance(writer, waters_model.LETTask):
         # LET delay is already accounted by read-to-write delay
-        details['WR:'+writer.name+':'+reader.name] = 0
-        return 0
+        # only take care for non-harmonic periods
+        result = _period(reader) % _period(writer)
+        details['WR:'+writer.name+':'+reader.name+'+harmOffset'] = result
+        return result
 
     else:
-        return _calculate_distance(writer, reader, task_results, details)
+        return _calculate_distanceBW(writer, reader, task_results, details)
     
 def _write_to_read(writer, reader, task_results, details, backward=False):
     """ computes the write to read distance between two tasks

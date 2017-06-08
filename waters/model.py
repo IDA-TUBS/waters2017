@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 | Copyright (C) 2017 Johannes Schlatow, Kai-Björn Gemlau, Mischa Möstl
 | TU Braunschweig, Germany
